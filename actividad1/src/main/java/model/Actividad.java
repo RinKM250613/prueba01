@@ -1,6 +1,6 @@
 package model;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -35,7 +35,7 @@ public class Actividad {
 	private Categoria idCategoria;
 	
 	@Column(name = "fecha_inicio", nullable = false)
-	private LocalDateTime fechaIni;
+	private LocalDate fechaIni;
 	
 	@Column(name = "nro_vacantes", nullable = false)
 	private int nroVacantes;

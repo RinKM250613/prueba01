@@ -1,6 +1,6 @@
 package model;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -41,8 +41,8 @@ public class Solicitud {
 	@Column(name = "archivo_adjunto", nullable = false)
 	private String archivo;
 	
-	@Column(name = "fecha_reg", nullable = false)
-	private LocalDateTime fechaReg;
+	@Column(name = "fecha_reg", columnDefinition = "INT NOT NULL DEFAULT CURRENT_TIMESTAMP")
+	private LocalDate fechaReg;
 
 
 }

@@ -3,11 +3,14 @@ package gui;
 import java.awt.EventQueue;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.Persistence;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
@@ -254,103 +257,97 @@ public class DlgSolicitud extends JDialog implements ActionListener {
 
 	void cargarActividades() {
 		EntityManager manager = JPAUtil.getEntityManager();
-		
+
 		try {
 			String jpql = "select a from Actividad a";
 			List<Actividad> lstActividades = manager.createQuery(jpql, Actividad.class).getResultList();
-			
+
 			for (Actividad actividad : lstActividades) {
 				cboActividad.addItem(actividad);
 			}
-			
+
 		} finally {
 			manager.close();
 		}
 	}
 
 	void listar() {
-		
+
 		EntityManager manager = JPAUtil.getEntityManager();
 		String jpql = "select s, a.descripcion, a.fechaIni, a.nroVacantes, c.descripcion from Solicitud s join s.idAct a join a.idCategoria c order by s.nroSoli";
-		
+
 		try {
-		    List<Object[]> resultados = manager.createQuery(jpql, Object[].class).getResultList();
+			List<Object[]> resultados = manager.createQuery(jpql, Object[].class).getResultList();
 
-		    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+			for (Object[] fila : resultados) {
+				Solicitud solicitud = (Solicitud) fila[0];
+				String descActividad = (String) fila[1];
+				LocalDate fechaInicio = (LocalDate) fila[2];
+				Integer nroVacantes = (Integer) fila[3];
+				String descCategoria = (String) fila[4];
 
-		    for (Object[] fila : resultados) {
-		        Solicitud solicitud = (Solicitud) fila[0];
-		        String descActividad = (String) fila[1];
-		        LocalDateTime fechaInicio = (LocalDateTime) fila[2];
-		        Integer nroVacantes = (Integer) fila[3];
-		        String descCategoria = (String) fila[4];	
-
-		        String fechaRegFormateada = solicitud.getFechaReg().format(formatter);
-		        String fechaIniFormateada = fechaInicio.format(formatter);
-
-		        imprimir("Nro de Solicitud.....:" + solicitud.getNroSoli());
-		        imprimir("Fecha de Registro....:" + fechaRegFormateada);
-		        imprimir("Actividad............:" + descActividad);
-		        imprimir("Fecha de Inicio......:" + fechaIniFormateada);
-		        imprimir("Nro de Vacantes......:" + nroVacantes);
-		        imprimir("Categoria............:" + descCategoria);
-		        imprimir("Archivo adjunto......:" + solicitud.getArchivo());
-		        imprimir("Estado...............:" + solicitud.getEstado() + "\n");
-		    }
+				imprimir("Nro de Solicitud.....:" + solicitud.getNroSoli());
+				imprimir("Fecha de Registro....:" + solicitud.getFechaReg());
+				imprimir("Actividad............:" + descActividad);
+				imprimir("Fecha de Inicio......:" + fechaInicio);
+				imprimir("Nro de Vacantes......:" + nroVacantes);
+				imprimir("Categoria............:" + descCategoria);
+				imprimir("Archivo adjunto......:" + solicitud.getArchivo());
+				imprimir("Estado...............:" + solicitud.getEstado() + "\n");
+			}
 
 		} finally {
-		    manager.close();
+			manager.close();
 		}
-		
+
 	}
 
 	void adicionar() {
-		
+
 		Actividad actividad = (Actividad) cboActividad.getSelectedItem();
 		String estado = (String) cboEstado.getSelectedItem();
 		String archivo = txtArchivoAdjunto.getText();
-		
-		LocalDateTime fechaRegs = LocalDateTime.now();
-		
-		Solicitud solicitud = new Solicitud(null, actividad, estado, archivo, fechaRegs);
-		
+
+		Solicitud solicitud = new Solicitud(0, actividad, estado, archivo, null);
+
 		EntityManager manager = JPAUtil.getEntityManager();
-		
+
 		try {
 			manager.getTransaction().begin();
 			manager.persist(solicitud);
 			manager.getTransaction().commit();
-			
+
 			mensaje("Se ha registrado un nuevo producto", "Exitoso", 1);
-			
+
 			limpiar();
 		} finally {
 			manager.close();
 		}
 	}
-	
+
 	void buscar() {
 
 		Integer nroSoli = Integer.parseInt(txtIdSolicitud.getText());
-		
+
 		EntityManager manager = JPAUtil.getEntityManager();
-		
+
 		try {
 			Solicitud solicitud = manager.find(Solicitud.class, nroSoli);
-			
+
 			if (solicitud == null) {
-				JOptionPane.showMessageDialog(null, "No existe producto", "ERROR", JOptionPane.ERROR_MESSAGE);
+				mensajeError("Solicitud no encontrada");
 				return;
 			}
-			
+
 			txtArchivoAdjunto.setText(solicitud.getArchivo());
-			cboActividad.setSelectedItem(solicitud.getIdAct());			
+			cboActividad.setSelectedItem(solicitud.getIdAct());
 			cboEstado.setSelectedItem(solicitud.getEstado());
-			
+
 			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 			txtFechaRegistro.setText(solicitud.getFechaReg().format(formatter));
 
-		
+			habilitarOk();
+
 		} finally {
 			manager.close();
 		}
@@ -358,10 +355,75 @@ public class DlgSolicitud extends JDialog implements ActionListener {
 
 	void modificar() {
 
-		habilitarOk();
+		EntityManager manager = JPAUtil.getEntityManager();
+
+		try {
+			Integer nroSoli = Integer.parseInt(txtIdSolicitud.getText());
+			Solicitud solicitud = manager.find(Solicitud.class, nroSoli);
+
+			if (solicitud != null) {
+
+				solicitud.setArchivo(txtArchivoAdjunto.getText());
+				solicitud.setIdAct((Actividad) cboActividad.getSelectedItem());
+				solicitud.setEstado((String) cboEstado.getSelectedItem());
+				solicitud.setFechaReg(
+						LocalDate.parse(txtFechaRegistro.getText(), DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+
+				manager.getTransaction().begin();
+				manager.merge(solicitud);
+				manager.getTransaction().commit();
+
+				mensajeInfo("Solicitud actualizada");
+				limpiar();
+			} else {
+				mensajeError("Solicitud no encontrada para modificar");
+			}
+
+		} catch (Exception e) {
+
+			if (manager.getTransaction().isActive()) {
+				manager.getTransaction().rollback();
+			}
+
+			mensajeError("Error al modificar la solicitud: " + e.getMessage());
+		} finally {
+			manager.close();
+		}
 	}
 
 	void eliminar() {
+
+		EntityManager manager = JPAUtil.getEntityManager();
+		
+		try {
+			
+			Integer nroSoli = Integer.parseInt(txtIdSolicitud.getText());
+			Solicitud solicitud = manager.find(Solicitud.class, nroSoli);
+			
+			if (solicitud != null) {
+				
+				manager.getTransaction().begin();
+				manager.remove(solicitud);
+				manager.getTransaction().commit();
+
+				
+				mensajeInfo("Solicitud eliminada");
+				limpiar();			
+				
+			} else {
+				mensajeError("Solicitud no encontrada para eliminar");
+			}
+
+			
+		} catch (Exception e) {
+			if (manager.getTransaction().isActive()) {
+				manager.getTransaction().rollback();
+			}
+			
+			mensajeError("Error al eliminar la solicitud" + e.getMessage());
+		} finally {
+			manager.close();
+		}
 
 	}
 
